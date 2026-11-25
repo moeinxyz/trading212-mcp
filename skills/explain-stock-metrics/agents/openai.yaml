@@ -1,0 +1,4 @@
+interface:
+  display_name: "Company earnings scorecard"
+  short_description: "Understand EPS, cash, debt and valuation in plain English"
+  default_prompt: "Use $explain-stock-metrics to show this company’s results in a plain-English matrix and explain what changed."

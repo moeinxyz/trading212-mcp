@@ -1,0 +1,4 @@
+interface:
+  display_name: "My portfolio report card"
+  short_description: "Explain accounts, returns, risks and opportunities in one table"
+  default_prompt: "Use $portfolio-report-card to show how my Invest and ISA accounts are doing in a plain-English matrix."

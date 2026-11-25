@@ -22,16 +22,11 @@ If a desktop client cannot find the command, set `command` to its full path from
 
 ## Accounts and credentials
 
-Your first key can belong to Invest or Stocks ISA. The default account label is `primary`. To add an ISA or another account, switch accounts in Trading 212, generate a separate pair, and add a section to the private file.
+Your first key can belong to Invest or Stocks ISA and is labelled `primary`. To connect a second account, switch to it in Trading 212 and generate its own read-only key pair. Run `trading212-mcp setup --account isa` to save the pair under `isa`. If your first account was ISA and the second is Invest, use `--account invest` instead. For a fresh setup you can also name both accounts explicitly with `setup --account invest` and `setup --account isa`. Restart the MCP client.
 
-```toml
-[trading_accounts.isa]
-T212_ENV = "live"
-T212_API_KEY = "<second account key>"
-T212_API_SECRET = "<second account secret>"
-```
+Ask “Show only my ISA” to select the appropriate label. Ask “Show both accounts and combine the GBP balances” to use `get_portfolio_overview(accounts=["primary", "isa"])`. Without a selection, the overview tries all configured profiles and identifies unconfigured ones. It shows each account's available cash, investments and total value. It groups values by live/practice and currency and counts each broker account ID once. A failed requested account makes the combined total unavailable. The separate account results show what was actually retrieved.
 
-Use `account="isa"` when requesting that account. Labels come from your configuration. Before combining portfolios, compare each broker-returned account ID with **Menu → My account → Account details**. Two different keys can point to the same portfolio. [Finding your account number](https://helpcentre.trading212.com/hc/en-us/articles/360008823837-Where-can-I-find-my-account-reference-number)
+Labels describe your configuration. Check each broker ID in `get_account_summary` against **Menu → My account → Account details** to confirm which account is which. Two different keys can refer to the same account. [Finding your account number](https://helpcentre.trading212.com/hc/en-us/articles/360008823837-Where-can-I-find-my-account-reference-number)
 
 To reuse an existing settings file, pass its absolute path in the client environment as `T212_CONFIG_FILE`. The file uses `[trading]` for primary and `[trading_accounts.<label>]` for other accounts. On Unix the owner must be the current user and the file must be private (`chmod 600`). For environment-only setups, pass `T212_ENV`, `T212_API_KEY` and `T212_API_SECRET` through a private launcher. Optional `T212_ISA_API_KEY` and `T212_ISA_API_SECRET` add an ISA in the same environment. Explicit server settings take precedence over automatic file discovery. An environment override for credentials must supply the key and secret together.
 
@@ -40,7 +35,8 @@ To reuse an existing settings file, pass its absolute path in the client environ
 | Tool | Key permission |
 | --- | --- |
 | `trading_status` | Local |
-| `get_account_summary` | `account` |
+| `get_account_summary`, `get_portfolio_overview` | `account` for each account selected |
+| `calculate_stock_metrics` | Local arithmetic on supplied financial statements |
 | `list_positions` | `portfolio` |
 | `list_pending_orders` | `orders:read` |
 | `trading_history` | `history:orders`, `history:dividends` or `history:transactions` for the requested feed |
@@ -60,8 +56,10 @@ In a client with MCP prompt support, open its prompt picker and choose a Trading
 
 News and event research uses the host's web access or dated source documents. Allocation drift needs a target or an earlier allocation. Period returns need dated valuations and external cash flows. The portfolio tools expose current holdings and history, and the workflows identify missing inputs when the available data cannot answer the question.
 
+For a beginner overview, use `portfolio_report_card`. Ask for a specific account, both accounts, or all configured accounts. For a single issuer, `explain_stock_metrics` can use `calculate_stock_metrics` for consistent arithmetic on sourced filing figures. `find_portfolio_opportunities` and `interpret_market_signals` distinguish possible follow-ups from verified outcomes. [Example report and research sources](research.md)
+
 ## Privacy and terms
 
 Credentials go to Trading 212 over HTTPS. Tool results can contain identifiers, balances, positions and transactions. Your MCP client controls which results reach its model provider. Keep keys and account exports out of prompts, issues and Git. You can revoke keys in Trading 212 at any time.
 
-This is an independent personal project. Trading 212 describes personal access for testing in §6.2 and requires prior written consent for uses covered by §6.3, including developing an API application intended for other end users. The code’s MIT licence and the broker's API access terms govern different things. Financial losses are possible. Verify figures and orders in the broker app. The software is provided as-is under the warranty and liability terms of the MIT licence. [API terms](https://www.trading212.com/legal-documentation/API-Terms_EN.pdf#page=7) · [MIT licence](../LICENSE)
+I built this for my own use. If you choose to use it, you do so at your own risk. This is an independent personal project. Trading 212 describes personal access for testing in §6.2 and requires prior written consent for uses covered by §6.3, including developing an API application intended for other end users. The code’s MIT licence and the broker's API access terms govern different things. Financial losses are possible. Verify figures and orders in the broker app. The software is provided as-is under the warranty and liability terms of the MIT licence. [API terms](https://www.trading212.com/legal-documentation/API-Terms_EN.pdf#page=7) · [MIT licence](../LICENSE)

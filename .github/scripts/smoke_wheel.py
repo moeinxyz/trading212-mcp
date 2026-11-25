@@ -28,6 +28,8 @@ async def main() -> None:
         tools = (await client.list_tools()).tools
         assert {t.name for t in tools} == {
             "trading_status",
+            "get_portfolio_overview",
+            "calculate_stock_metrics",
             "get_account_summary",
             "list_positions",
             "list_pending_orders",
@@ -39,6 +41,34 @@ async def main() -> None:
         assert not status.isError and status.structuredContent
         assert status.structuredContent["credentials_configured"] is False
         assert status.structuredContent["writes_enabled"] is False
+
+        overview = await client.call_tool("get_portfolio_overview", {})
+        assert (
+            not overview.isError
+            and overview.structuredContent["status"] == "unavailable"
+        )
+        metrics = await client.call_tool(
+            "calculate_stock_metrics",
+            {
+                "currency": "GBP",
+                "amount_scale": "millions",
+                "current": {
+                    "period_kind": "year",
+                    "period_start": "2025-01-01",
+                    "period_end": "2025-12-31",
+                    "source": "Fictional annual report, income statement",
+                    "revenue": "100",
+                    "operating_profit": "15",
+                },
+            },
+        )
+        assert not metrics.isError
+        margin = next(
+            row
+            for row in metrics.structuredContent["rows"]
+            if row["metric"] == "operating_margin"
+        )
+        assert (margin["current"], margin["unit"]) == ("15", "%")
 
         prompts = {prompt.name for prompt in (await client.list_prompts()).prompts}
         assert prompts == {name.replace("-", "_") for name in wheel_skills}

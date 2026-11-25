@@ -1,0 +1,4 @@
+interface:
+  display_name: "Find portfolio opportunities"
+  short_description: "Find portfolio improvements and weigh the trade-offs"
+  default_prompt: "Use $find-portfolio-opportunities to find improvements I may be overlooking and explain how to check each one."

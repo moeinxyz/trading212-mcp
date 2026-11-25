@@ -20,6 +20,8 @@ from pydantic import BaseModel, Field
 
 from .broker import EQUITY, History, Side, Trading212
 from .config import CONFIG_KEYS, configured_accounts
+from .metrics import calculate_stock_metrics
+from .overview import portfolio_overview
 
 JsonObject = dict[str, Any]
 AccountLabel = Annotated[
@@ -75,13 +77,18 @@ def load_prompts(directory: Path) -> dict[str, types.GetPromptResult]:
 
 
 def create_server(accounts: Mapping[str, Trading212]) -> Server:
-    primary = accounts["primary"]
+    profiles = accounts
+    primary = profiles["primary"]
     server = Server(
         "Trading 212 MCP",
         version=version("moein-trading212-mcp"),
         instructions=(
-            "Use trading_status to identify account labels and demo/live environments. Compare broker account IDs "
-            "before combining portfolios. Use the currency on each broker field. A next_page_path means the same "
+            "Use trading_status to find configured labels and demo/live environments. Select the requested label "
+            "explicitly, including when primary has no key. A label is user-defined. Verify it with the account "
+            "owner when its meaning is unclear. Compare broker account IDs "
+            "before combining portfolios, or use get_portfolio_overview for several accounts. This is a personal "
+            "research project. Verify figures before making investment decisions. Use the currency on each broker "
+            "field. A next_page_path means the same "
             "account and history feed has more pages. Optional DAY limit orders apply only to the primary account."
         ),
     )
@@ -89,13 +96,22 @@ def create_server(accounts: Mapping[str, Trading212]) -> Server:
     # preserves explicit profile selection without FastMCP's automatic .env lookup.
     tools = ToolManager()
     read_tool = partial(tools.add_tool, annotations=READ)
+    tools.add_tool(
+        calculate_stock_metrics,
+        annotations=types.ToolAnnotations(
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
 
     def select(label: str) -> Trading212:
-        if label not in accounts:
+        if label not in profiles:
             raise ValueError(
                 "Account unavailable. Choose a label returned by trading_status."
             )
-        api = accounts[label]
+        api = profiles[label]
         if label != "primary" and not api.credentials_configured:
             raise ValueError("This named account has no configured credential pair.")
         return api
@@ -114,13 +130,21 @@ def create_server(accounts: Mapping[str, Trading212]) -> Server:
         return {
             "provider": "Trading 212",
             **primary.status(),
-            "accounts": {name: api.status() for name, api in accounts.items()},
+            "accounts": {name: api.status() for name, api in profiles.items()},
         }
 
     @read_tool
     async def get_account_summary(account: AccountLabel = "primary") -> JsonObject:
         """Get the account's cash, investments and portfolio value in its primary currency."""
         return await read(account, f"{EQUITY}/account/summary", "account")
+
+    @read_tool
+    async def get_portfolio_overview(
+        accounts: Annotated[list[AccountLabel], Field(min_length=1, max_length=50)]
+        | None = None,
+    ) -> JsonObject:
+        """Read selected account summaries, or all configured accounts. Group totals by environment and currency."""
+        return await portfolio_overview(profiles, accounts)
 
     @read_tool
     async def list_positions(

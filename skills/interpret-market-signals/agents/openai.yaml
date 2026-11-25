@@ -1,0 +1,4 @@
+interface:
+  display_name: "Market signals"
+  short_description: "Explain analyst ratings, target prices and forecast changes"
+  default_prompt: "Use $interpret-market-signals to explain what changed in the published signals for my holdings, who reported it, and what I can conclude from it."

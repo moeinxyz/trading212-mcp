@@ -38,6 +38,8 @@ def test_read_only_tool_list_and_unconfigured_guidance():
             assert all(tool.annotations.readOnlyHint for tool in tools)
             assert {tool.name for tool in tools} == {
                 "trading_status",
+                "get_portfolio_overview",
+                "calculate_stock_metrics",
                 "get_account_summary",
                 "list_positions",
                 "list_pending_orders",

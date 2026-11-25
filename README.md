@@ -2,30 +2,28 @@
 
 [![CI](https://github.com/moeinxyz/trading212-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/moeinxyz/trading212-mcp/actions/workflows/ci.yml)
 
-Ask your assistant about your Trading 212 Invest or Stocks ISA account. The server runs locally with your own API key and starts read-only.
+I built this for my own portfolio. It lets an assistant read Trading 212 Invest and Stocks ISA accounts locally and explain the numbers. **Use it at your own risk.** Figures and AI analysis can be wrong. I don’t provide investment advice through this project. You make your own investment decisions. Check figures and orders in Trading 212 before acting.
 
 ## Get started
 
-In Trading 212, switch to the account you want, then open **Menu → Settings → API (Beta) → Generate API key**. Select **Account data** and **Portfolio** for holdings and cash. Install with Git and [uv](https://docs.astral.sh/uv/getting-started/installation/), then run setup.
+In each account, open **Menu → Settings → API (Beta) → Generate API key**. Select **Account data** and **Portfolio** for holdings and cash. With Git and [uv](https://docs.astral.sh/uv/getting-started/installation/) installed, set up the first account. Keys are entered privately and orders are disabled by default.
 
 ```sh
-uv tool install git+https://github.com/moeinxyz/trading212-mcp@v0.2.0
+uv tool install git+https://github.com/moeinxyz/trading212-mcp@v0.3.0
 trading212-mcp setup
 ```
 
-Setup asks for your key and one-time secret in the terminal. For Codex, register the server with `codex mcp add trading212 -- trading212-mcp`. Restart your client and ask **“What do I hold, and how much cash is available?”** [Other clients, multiple accounts and optional orders](docs/configuration.md)
+Have a second account? Switch to it in Trading 212, generate its own key, and run `trading212-mcp setup --account isa`. For Codex, register the server with `codex mcp add trading212 -- trading212-mcp`. Restart the client and ask for Invest, ISA or both. [Client setup and account labels](docs/configuration.md#accounts-and-credentials)
 
-## Research with your holdings
+## Ask about your portfolio
 
-| Ask | Skill |
+| Ask | Workflow |
 | --- | --- |
-| Which news this week actually affects my holdings? | [Portfolio news](skills/review-portfolio-news/SKILL.md) |
-| How far have I moved from my target allocation? | [Allocation drift](skills/check-allocation-drift/SKILL.md) |
-| Where do my ETFs overlap, and what would a 15% drop cost me? | [Portfolio risk](skills/analyze-portfolio-risk/SKILL.md) |
-| Which earnings dates or corporate actions are coming up? | [Upcoming events](skills/preview-portfolio-events/SKILL.md) |
-| How did I do against my benchmark after accounting for deposits? | [Portfolio performance](skills/analyze-portfolio-performance/SKILL.md) |
-| Does the company’s cash generation support its valuation? | [Stock fundamentals](skills/analyze-stock/SKILL.md) |
+| “How am I doing across Invest and ISA? Give me one simple table.” | [Portfolio report card](skills/portfolio-report-card/SKILL.md) · [Worked example](docs/research.md#an-example-report-card) |
+| “What does diluted EPS tell me? Are earnings turning into cash?” | [Company metrics](skills/explain-stock-metrics/SKILL.md) · [Stock fundamentals](skills/analyze-stock/SKILL.md) |
+| “Which opportunities am I overlooking, and what would they cost?” | [Opportunity review](skills/find-portfolio-opportunities/SKILL.md) · [Allocation drift](skills/check-allocation-drift/SKILL.md) |
+| “Did analysts change their estimates? What news affects my holdings?” | [Published signals](skills/interpret-market-signals/SKILL.md) · [Portfolio news](skills/review-portfolio-news/SKILL.md) |
 
-All six ship as MCP prompts and Agent Skills. News and event reviews run on demand using your assistant’s web access or sources you supply. [Using the skills](docs/configuration.md#research-skills)
+All ten workflows ship as MCP prompts and Agent Skills, including [portfolio risk](skills/analyze-portfolio-risk/SKILL.md), [performance](skills/analyze-portfolio-performance/SKILL.md) and [upcoming events](skills/preview-portfolio-events/SKILL.md). Market research uses your assistant’s web access or dated sources you supply. [Using the skills](docs/configuration.md#research-skills)
 
-Independent software by Moein, distributed under the [MIT licence](LICENSE). Analysis is informational and can be wrong. Your MCP client can share tool results with its model provider. Use of the broker API is subject to [Trading 212’s API terms](https://www.trading212.com/legal-documentation/API-Terms_EN.pdf).
+An independent project by Moein under the [MIT licence](LICENSE). Your MCP client can share results with its model provider. Broker access is subject to [Trading 212’s API terms](https://www.trading212.com/legal-documentation/API-Terms_EN.pdf).
