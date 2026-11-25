@@ -1,0 +1,4 @@
+interface:
+  display_name: "Stock fundamentals"
+  short_description: "Evaluate a listed company from its public filings"
+  default_prompt: "Use $analyze-stock to assess a listed company’s business, financials and valuation."

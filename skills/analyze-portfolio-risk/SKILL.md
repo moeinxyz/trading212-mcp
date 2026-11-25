@@ -1,0 +1,31 @@
+---
+name: analyze-portfolio-risk
+description: Quantify a portfolio's holdings, concentration, fund overlap and sensitivity to price or FX shocks from Trading 212 accounts or supplied positions. Use for exposure and risk questions about a set of holdings.
+---
+
+# Analyse portfolio exposure and risk
+
+Start with the largest evidenced exposure and what it means in the portfolio's reporting currency. State the included accounts, valuation date and denominator. Keep account identifiers, quantities and values local when looking up public instrument metadata.
+
+## Establish the holdings and denominator
+
+1. For the personal Trading 212 MCP, use `trading_status()` to identify the environment and configured labels. Call `get_account_summary(account=...)` and unfiltered `list_positions(account=...)` for each requested account. The summary sits under `account` and position rows under `positions`. Privately compare the returned account IDs before combining accounts to avoid counting the same portfolio twice. Use labels in the answer and report which accounts you covered. Record the retrieval time and environment. Separate calls can see changing prices. Keep demo balances separate from real holdings. For a supplied statement, use its valuation date, asset coverage and currency.
+2. Identify the share class using `instrument.isin`, `instrument.ticker` and `instrument.name`. Prefer `walletImpact.currentValue` for each whole position in `walletImpact.currency`. The per-share `currentPrice` and `averagePricePaid` are in `instrument.currency`. If reconstructing a missing value, check quote minor units (e.g. GBp), share units, any FX conversion and the date used. `quantityInPies` is already part of `quantity`. A history of purchases or the value of an existing Pie would overlap with current holdings. [Trading 212 position fields](https://docs.trading212.com/api/positions/getpositions)
+3. Reconcile the sum of positions to `account.investments.currentValue` in `account.currency`. For a whole-account weight, use the reported `account.totalValue` after checking it against investments and cash. `account.cash.availableToTrade` answers how much cash is immediately available. Other balances can include `cash.inPies` and `cash.reservedForOrders`. Avoid adding cash to an account total that includes it. If two reads disagree materially, show the difference and their observation times. Include pending orders only in a hypothetical scenario. [Trading 212 account summary](https://docs.trading212.com/api/accounts/getaccountsummary)
+4. Use one dated FX basis for aggregating currencies expressed as reporting-currency units per unit of source currency. Without a suitable rate, report subtotals in each currency. The currency of a listing identifies its pricing unit. An issuer's revenue, costs and hedges can give it quite different economic exposures.
+5. When only position values are available, express weights as shares of the **valued positions** and list the missing cash, unpriced holdings or accounts. Quantify the count or known value of omitted positions. With zero or negative net asset value (NAV), give signed currency amounts and explain why percentages of NAV are undefined or misleading.
+
+## Calculate the risks that answer the question
+
+| Measure | Calculation and interpretation |
+| --- | --- |
+| Largest positions | Weight equals market value divided by the stated denominator. Show the largest positions and their combined weight. Consolidate multiple lines in one issuer when discussing issuer risk. |
+| Diversification | For a fully valued long-only invested sleeve, with weights summing to one, concentration is `Σ(weight²)` and the effective number of equally sized holdings is its reciprocal. Name the aggregation level. A fund counted as one instrument can conceal broad diversification. For leveraged or short portfolios, show gross absolute and net signed exposures relative to NAV separately. |
+| Fund overlap | Use a dated holdings file or factsheet from the fund manager for the correct fund and share class. Each underlying issuer contributes `portfolio weight in fund × constituent weight in fund`. Combine it with direct exposure to the same issuer. In the look-through view, replace the fund line once. Carry the unreported fraction as unknown. Separate known issuer exposure from additional possible exposure when holdings are partial. |
+| Stress loss | For a specified percentage shock to one or more disjoint exposures, sum `position market value × shock`. Divide by the same NAV or valued-holdings denominator for the percentage impact. For simultaneous local-price and currency shocks to one asset, apply `(1 + local return) × (1 + FX return) − 1`. Show the rate convention and keep unrelated positions constant in this scenario. |
+
+For example, if a fund holds 10% of a portfolio and lists an issuer at 4% of the fund, the fund contributes 0.4 percentage points of portfolio exposure to that issuer. If only the fund's top holdings are disclosed, their weights apply as published. Rescaling them to 100% would overstate the identified exposures.
+
+One observation supports current exposure and stress calculations. Trading 212’s `trading_history` can supply fills, dividends and cash movements across pages. Follow each returned `next_page_path` on the same account and feed, respect any coverage warning and report the period actually covered. For a request about realised returns, drawdown or volatility, obtain dated portfolio valuations and external cash flows, or matching total-return price series for a specifically labelled hypothetical holdings backtest. Deposits and withdrawals affect account value. A position's unrealised gain measures a change since acquisition and covers only assets still held. Use aligned observation dates, consistent FX conversion and a stated rebalancing assumption for a backtest.
+
+In the answer, distinguish directly measured exposure, look-through estimates and unknown exposure. Give a concrete scenario with its assumptions and both the monetary and percentage impact when supported. Quantify how much of the portfolio had usable classifications or holdings data. Cite each external fund or FX source with its as-of date.

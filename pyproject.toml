@@ -1,0 +1,56 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "moein-trading212-mcp"
+version = "0.1.0"
+description = "Local MCP access to your own Trading 212 Invest and Stocks ISA accounts"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Moein (moeinxyz)" }]
+requires-python = ">=3.11"
+dependencies = ["httpx>=0.27,<1", "mcp>=1.27,<2", "pydantic>=2.11,<3"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Office/Business :: Financial",
+]
+
+[project.urls]
+Source = "https://github.com/moeinxyz/trading212-mcp"
+Issues = "https://github.com/moeinxyz/trading212-mcp/issues"
+
+[project.scripts]
+moein-trading212-mcp = "trading212_mcp.server:main"
+trading212-mcp = "trading212_mcp.server:main"
+
+[dependency-groups]
+dev = ["pytest>=8,<10"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.hatch.build.targets.sdist]
+only-include = [
+    "pyproject.toml", "README.md", "LICENSE", "uv.lock",
+    "src/trading212_mcp/__init__.py", "src/trading212_mcp/server.py",
+    "src/trading212_mcp/broker.py", "src/trading212_mcp/config.py",
+    "skills/analyze-stock/SKILL.md", "skills/analyze-stock/agents/openai.yaml",
+    "skills/analyze-portfolio-risk/SKILL.md", "skills/analyze-portfolio-risk/agents/openai.yaml",
+    "tests/test_trading.py",
+]
+
+[tool.hatch.build.targets.wheel]
+sources = ["src"]
+only-include = [
+    "src/trading212_mcp/__init__.py", "src/trading212_mcp/server.py",
+    "src/trading212_mcp/broker.py", "src/trading212_mcp/config.py",
+]
+
+[tool.hatch.build.targets.wheel.force-include]
+"skills/analyze-stock/SKILL.md" = "trading212_mcp/skills/analyze-stock/SKILL.md"
+"skills/analyze-stock/agents/openai.yaml" = "trading212_mcp/skills/analyze-stock/agents/openai.yaml"
+"skills/analyze-portfolio-risk/SKILL.md" = "trading212_mcp/skills/analyze-portfolio-risk/SKILL.md"
+"skills/analyze-portfolio-risk/agents/openai.yaml" = "trading212_mcp/skills/analyze-portfolio-risk/agents/openai.yaml"

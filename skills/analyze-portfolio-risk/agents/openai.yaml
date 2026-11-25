@@ -1,0 +1,4 @@
+interface:
+  display_name: "Portfolio exposure and risk"
+  short_description: "Measure holdings concentration and scenario exposure"
+  default_prompt: "Use $analyze-portfolio-risk to explain my holdings, concentrations and sensitivity to a market shock."
