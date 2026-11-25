@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review news affecting a portfolio"
+  short_description: "Connect verified news to specific holdings and exposures"
+  default_prompt: "Use $review-portfolio-news to explain which recent announcements matter to my portfolio and why."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Check portfolio allocation drift"
+  short_description: "Compare observed weights with targets or a prior allocation"
+  default_prompt: "Use $check-allocation-drift to check my allocation against my targets and distinguish drift from concentration."

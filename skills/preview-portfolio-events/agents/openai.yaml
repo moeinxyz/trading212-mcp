@@ -1,0 +1,4 @@
+interface:
+  display_name: "Preview upcoming portfolio events"
+  short_description: "Find confirmed dates and questions for upcoming events"
+  default_prompt: "Use $preview-portfolio-events to show the next confirmed earnings and distribution dates for my holdings."

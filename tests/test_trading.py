@@ -1,9 +1,10 @@
 import asyncio
 import base64
 import json
-from decimal import Decimal
-from pathlib import Path
 import sys
+from decimal import Decimal
+from importlib.metadata import version
+from pathlib import Path
 
 import httpx
 import pytest
@@ -12,7 +13,8 @@ from mcp.client.stdio import stdio_client
 from mcp.shared.memory import create_connected_server_and_client_session
 
 from trading212_mcp.broker import EQUITY, Trading212
-from trading212_mcp.server import configured_accounts, create_server
+from trading212_mcp.config import configured_accounts
+from trading212_mcp.server import create_server
 
 
 def broker(handler, *, write=False):
@@ -410,7 +412,10 @@ def test_stdio_starts_without_credentials_or_dotenv(tmp_path):
 import os, sys
 def audit(event, args):
     if event == 'socket.connect':
-        raise RuntimeError('status or prompts initiated a connection')
+        # Windows asyncio can create its wakeup socketpair using a TCP loopback connection.
+        address = args[1]
+        if sys.platform != 'win32' or not isinstance(address, tuple) or address[0] not in ('127.0.0.1', '::1'):
+            raise RuntimeError('status or prompts initiated an external connection')
     if event == 'open' and isinstance(args[0], str) and os.path.basename(args[0]) == '.env':
         raise RuntimeError('unexpected dotenv access')
 sys.addaudithook(audit)
@@ -422,12 +427,14 @@ main()
         command=sys.executable,
         args=["-c", bootstrap],
         cwd=tmp_path,
-        env={"PYTHONPATH": str(Path(__file__).resolve().parents[1] / "src")},
+        env={},
     )
 
     async def check():
         async with stdio_client(params) as (rd, wr), ClientSession(rd, wr) as client:
-            await client.initialize()
+            assert (await client.initialize()).serverInfo.version == version(
+                "moein-trading212-mcp"
+            )
             result = (await client.call_tool("trading_status", {})).structuredContent
             assert (
                 result["environment"] == "demo"
@@ -435,7 +442,13 @@ main()
                 and not result["writes_enabled"]
             )
             assert set(result["accounts"]) == {"primary"}
-            for name in ("analyze_stock", "analyze_portfolio_risk"):
+            prompts = {item.name for item in (await client.list_prompts()).prompts}
+            source_skills = Path(__file__).resolve().parents[1] / "skills"
+            assert prompts == {
+                file.parent.name.replace("-", "_")
+                for file in source_skills.glob("*/SKILL.md")
+            }
+            for name in prompts:
                 assert (
                     len((await client.get_prompt(name)).messages[0].content.text) > 200
                 )
@@ -606,3 +619,125 @@ def test_redirect_is_not_followed_and_body_is_not_echoed():
     with pytest.raises(ValueError, match="302") as err:
         asyncio.run(broker(respond).request(EQUITY + "/positions"))
     assert calls == ["demo.trading212.com"] and "private-response" not in str(err.value)
+
+
+def test_typed_tools_reject_unexpected_order_fields():
+    async def check():
+        api = broker(lambda _: pytest.fail("Unexpected brokerage request"), write=True)
+        async with create_connected_server_and_client_session(
+            create_server({"primary": api})
+        ) as client:
+            tools = {tool.name: tool for tool in (await client.list_tools()).tools}
+            for tool in tools.values():
+                assert tool.inputSchema["additionalProperties"] is False
+            # Account selection on an order must never be silently stripped by the argument validator.
+            result = await client.call_tool(
+                "preview_limit_order",
+                {
+                    "account": "isa",
+                    "ticker": "EXAMPLE",
+                    "side": "buy",
+                    "quantity": "1",
+                    "limit_price": "5",
+                },
+            )
+            assert result.isError and "account" in result.content[0].text
+
+    asyncio.run(check())
+
+
+def test_concurrent_catalogue_requests_share_one_fetch():
+    async def check():
+        started, release = asyncio.Event(), asyncio.Event()
+        calls = []
+
+        async def respond(request):
+            calls.append(request.url.path)
+            started.set()
+            await release.wait()
+            return httpx.Response(
+                200, json=[{"ticker": "EXAMPLE", "name": "Example Corporation"}]
+            )
+
+        api = broker(respond)
+        first = asyncio.create_task(api.search_instruments("corp"))
+        await asyncio.wait_for(started.wait(), timeout=2)
+        second = asyncio.create_task(api.search_instruments("example"))
+        release.set()
+        a, b = await asyncio.gather(first, second)
+        assert a == b == [{"ticker": "EXAMPLE", "name": "Example Corporation"}]
+        assert calls == [EQUITY + "/metadata/instruments"]
+
+    asyncio.run(check())
+
+
+@pytest.mark.parametrize("expire_during_approval", [False, True])
+def test_preview_consumed_before_approval_and_checked_again_before_post(
+    monkeypatch, expire_during_approval
+):
+    from types import SimpleNamespace
+
+    from trading212_mcp import broker as module
+
+    async def check():
+        entered, release = asyncio.Event(), asyncio.Event()
+        clock = [1.0]
+        monkeypatch.setattr(module, "time", SimpleNamespace(monotonic=lambda: clock[0]))
+
+        async def confirm(message: str) -> bool:
+            assert "primary account" in message
+            entered.set()
+            await release.wait()
+            return True
+
+        posts = []
+
+        def respond(request):
+            if request.url.path.endswith("/metadata/instruments"):
+                return httpx.Response(
+                    200, json=[{"ticker": "EXAMPLE", "currencyCode": "GBP"}]
+                )
+            if request.url.path.endswith("/account/summary"):
+                return httpx.Response(200, json={"id": 12345, "currency": "GBP"})
+            posts.append(request.method)
+            return httpx.Response(200, json={"id": 7})
+
+        api = broker(respond, write=True)
+        preview = await api.preview("EXAMPLE", "buy", "1", "5")
+        token = preview["preview_id"]
+        first = asyncio.create_task(api.submit(token, confirm))
+        await asyncio.wait_for(entered.wait(), timeout=2)
+        with pytest.raises(ValueError, match="unavailable"):
+            await api.submit(token, confirm)
+        assert posts == []
+        if expire_during_approval:
+            clock[0] += 301
+        release.set()
+        if expire_during_approval:
+            with pytest.raises(ValueError, match="expired during approval"):
+                await first
+            assert posts == []
+        else:
+            assert (await first)["submitted"] and posts == ["POST"]
+
+    asyncio.run(check())
+
+
+def test_skill_discovery_uses_skill_files_and_ignores_unrelated_files(tmp_path):
+    from trading212_mcp.server import load_prompts
+
+    folder = tmp_path / "review-example"
+    folder.mkdir()
+    (folder / "SKILL.md").write_text(
+        "---\nname: review-example\n---\n\n# Review an example\n\nUse fictional observations.",
+        encoding="utf-8",
+    )
+    (tmp_path / "README.md").write_text("This file is not a skill.", encoding="utf-8")
+    prompts = load_prompts(tmp_path)
+    assert list(prompts) == ["review_example"]
+    result = prompts["review_example"]
+    assert result.description == "Review an example"
+    assert (
+        result.messages[0].content.text
+        == "# Review an example\n\nUse fictional observations."
+    )

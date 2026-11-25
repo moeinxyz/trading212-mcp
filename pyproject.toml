@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling>=1.27,<2"]
-build-backend = "hatchling.build"
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "moein-trading212-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "Local MCP access to your own Trading 212 Invest and Stocks ISA accounts"
 readme = "README.md"
 license = "MIT"
@@ -23,34 +23,28 @@ Source = "https://github.com/moeinxyz/trading212-mcp"
 Issues = "https://github.com/moeinxyz/trading212-mcp/issues"
 
 [project.scripts]
-moein-trading212-mcp = "trading212_mcp.server:main"
-trading212-mcp = "trading212_mcp.server:main"
+moein-trading212-mcp = "trading212_mcp.cli:main"
+trading212-mcp = "trading212_mcp.cli:main"
 
 [dependency-groups]
-dev = ["pytest>=8,<10"]
+dev = ["pytest>=8,<10", "ruff==0.17.6"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
-[tool.hatch.build.targets.sdist]
-only-include = [
-    "pyproject.toml", "README.md", "LICENSE", "uv.lock",
-    "src/trading212_mcp/__init__.py", "src/trading212_mcp/server.py",
-    "src/trading212_mcp/broker.py", "src/trading212_mcp/config.py",
-    "skills/analyze-stock/SKILL.md", "skills/analyze-stock/agents/openai.yaml",
-    "skills/analyze-portfolio-risk/SKILL.md", "skills/analyze-portfolio-risk/agents/openai.yaml",
-    "tests/test_trading.py",
-]
+[tool.setuptools]
+packages = ["trading212_mcp", "trading212_mcp.skills"]
+package-dir = { trading212_mcp = "src", "trading212_mcp.skills" = "skills" }
+include-package-data = false
 
-[tool.hatch.build.targets.wheel]
-sources = ["src"]
-only-include = [
-    "src/trading212_mcp/__init__.py", "src/trading212_mcp/server.py",
-    "src/trading212_mcp/broker.py", "src/trading212_mcp/config.py",
-]
+[tool.setuptools.package-data]
+"trading212_mcp.skills" = ["*/SKILL.md", "*/agents/openai.yaml"]
 
-[tool.hatch.build.targets.wheel.force-include]
-"skills/analyze-stock/SKILL.md" = "trading212_mcp/skills/analyze-stock/SKILL.md"
-"skills/analyze-stock/agents/openai.yaml" = "trading212_mcp/skills/analyze-stock/agents/openai.yaml"
-"skills/analyze-portfolio-risk/SKILL.md" = "trading212_mcp/skills/analyze-portfolio-risk/SKILL.md"
-"skills/analyze-portfolio-risk/agents/openai.yaml" = "trading212_mcp/skills/analyze-portfolio-risk/agents/openai.yaml"
+[tool.ruff]
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["trading212_mcp"]

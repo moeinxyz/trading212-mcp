@@ -1,4 +1,4 @@
-"""Local Trading 212 MCP server, using the broker's public v0 API."""
+"""Trading 212 HTTP client, portfolio data and single-use limit order previews."""
 
 import asyncio
 import json
@@ -6,16 +6,12 @@ import math
 import re
 import secrets
 import time
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal, localcontext
 from typing import Any, Literal
 
 import httpx
-from mcp.server.elicitation import elicit_with_validation
-from mcp.server.session import ServerSession
-from mcp.shared.exceptions import McpError
-from pydantic import BaseModel, Field
 
 EQUITY = "/api/v0/equity"
 HOSTS = {env: f"https://{env}.trading212.com" for env in ("demo", "live")}
@@ -34,12 +30,6 @@ READ_PATHS = {
 History = Literal["orders", "dividends", "transactions"]
 Side = Literal["buy", "sell"]
 UNCERTAIN = "Order outcome is unknown. Check pending orders and order history before placing another order."
-
-
-class ConfirmOrder(BaseModel):
-    approve: bool = Field(
-        description="Place this exact limit order?", default=False, strict=True
-    )
 
 
 @dataclass(frozen=True)
@@ -80,45 +70,55 @@ class OrderPreview:
 
 
 def check_page(path: str, endpoint: str) -> str:
-    # Follow only a query on the exact documented history endpoint. The broker's
-    # cursor can contain opaque, encoded data, so preserve the query verbatim.
-    if not isinstance(path, str) or not path or len(path) > 4096:
-        raise ValueError("Invalid next_page_path for this Trading 212 history feed.")
+    """Confine the continuation to its original feed, preserving the broker's encoded cursor."""
     if (
-        not path.isascii()
+        not isinstance(path, str)
+        or not path
+        or len(path) > 4096
+        or not path.isascii()
         or not path.isprintable()
         or any(char in path for char in (" ", "#", "\\"))
     ):
-        raise ValueError("Invalid characters in next_page_path.")
-    if path.startswith(endpoint + "?"):
-        query = path[len(endpoint) + 1 :]
-        params = {}
-        for part in query.split("&"):
-            key, separator, value = part.partition("=")
-            if (
-                not separator
-                or not value
-                or not re.fullmatch(r"[a-zA-Z0-9_]+", key)
-                or key in params
-            ):
-                raise ValueError("Invalid parameters in next_page_path.")
-            params[key] = value
-        if "cursor" not in params or (
-            "limit" in params
-            and not re.fullmatch(r"[1-9]|[1-4][0-9]|50", params["limit"])
+        raise ValueError("Invalid next_page_path for this Trading 212 history feed.")
+
+    prefix = endpoint + "?"
+    bare = not path.startswith(prefix)
+    if bare and endpoint != f"{EQUITY}/history/transactions":
+        raise ValueError("Invalid next_page_path for this Trading 212 history feed.")
+    # The cash feed sometimes returns just the query, with or without a leading '?'.
+    query = path.removeprefix("?") if bare else path.removeprefix(prefix)
+    params = {}
+    for part in query.split("&"):
+        key, separator, value = part.partition("=")
+        if (
+            not separator
+            or not value
+            or key in params
+            or not re.fullmatch(r"[a-zA-Z0-9_]+", key)
         ):
-            raise ValueError("Invalid cursor or limit in next_page_path.")
-        return path
-    # Cash history also returns a bare query on some accounts. Only accept
-    # known query keys and always attach them to our own cash-history path.
-    query = path.removeprefix("?")
-    if endpoint == f"{EQUITY}/history/transactions" and re.fullmatch(
-        r"(?:limit|cursor|time)=[^&/?#]+(?:&(?:limit|cursor|time)=[^&/?#]+)*", query
+            raise ValueError("Invalid parameters in next_page_path.")
+        if bare and (
+            key not in {"limit", "time", "cursor"} or "/" in value or "?" in value
+        ):
+            raise ValueError("Invalid parameters in next_page_path.")
+        params[key] = value
+    if "cursor" not in params or (
+        "limit" in params and not re.fullmatch(r"[1-9]|[1-4][0-9]|50", params["limit"])
     ):
-        keys = [part.partition("=")[0] for part in query.split("&")]
-        if "cursor" in keys and len(keys) == len(set(keys)):
-            return check_page(f"{endpoint}?{query}", endpoint)
-    raise ValueError("Invalid next_page_path for this Trading 212 history feed.")
+        raise ValueError("Invalid cursor or limit in next_page_path.")
+    return prefix + query
+
+
+def rate_limit_message(headers: httpx.Headers) -> str:
+    retry = headers.get("retry-after", "")
+    reset = headers.get("x-ratelimit-reset", "")
+    if re.fullmatch(r"[0-9]{1,10}", retry):
+        when = f"in {retry} seconds"
+    elif re.fullmatch(r"[0-9]{1,12}", reset):
+        when = f"in {max(1, math.ceil(int(reset) - time.time()))} seconds"
+    else:
+        when = "after the broker's rate window resets"
+    return f"Trading 212 rate limit reached. Try again {when}."
 
 
 class Trading212:
@@ -142,8 +142,19 @@ class Trading212:
         self.catalog_expires = 0.0
         self.catalog_lock = asyncio.Lock()
 
+    @property
+    def credentials_configured(self) -> bool:
+        return bool(self.key and self.secret)
+
+    def status(self) -> dict[str, Any]:
+        return {
+            "environment": self.env,
+            "credentials_configured": self.credentials_configured,
+            "writes_enabled": self.writes,
+        }
+
     async def request(self, path: str, *, order: OrderPreview | None = None) -> Any:
-        if not (self.key and self.secret):
+        if not self.credentials_configured:
             raise ValueError(
                 "Set T212_API_KEY and T212_API_SECRET for the selected T212_ENV, then restart."
             )
@@ -175,15 +186,7 @@ class Trading212:
                 else "Could not reach Trading 212. Try the read again."
             ) from None
         if response.status_code == 429:
-            reset = response.headers.get("x-ratelimit-reset", "")
-            retry = response.headers.get("retry-after", "")
-            if retry.isascii() and retry.isdecimal() and len(retry) <= 10:
-                wait = f" in {retry} seconds"
-            elif reset.isascii() and reset.isdecimal() and len(reset) <= 12:
-                wait = f" in {max(1, math.ceil(int(reset) - time.time()))} seconds"
-            else:
-                wait = " after the broker's rate window resets"
-            raise ValueError(f"Trading 212 rate limit reached. Try again{wait}.")
+            raise ValueError(rate_limit_message(response.headers))
         if response.status_code == 401:
             raise ValueError(
                 f"Trading 212 rejected the key pair for {self.env}. Check the account and environment."
@@ -223,6 +226,19 @@ class Trading212:
                 self.catalog_expires = time.monotonic() + 600
             return self.catalog
 
+    async def search_instruments(self, query: str) -> list[dict]:
+        needle = query.strip().casefold()
+        if not needle:
+            raise ValueError("Enter part of an instrument name, ticker or ISIN.")
+        return [
+            item
+            for item in await self.instruments()
+            if any(
+                needle in str(item.get(field, "")).casefold()
+                for field in ("name", "shortName", "ticker", "isin")
+            )
+        ]
+
     async def history(
         self, kind: History, limit: int, next_page_path: str | None
     ) -> dict[str, Any]:
@@ -234,26 +250,27 @@ class Trading212:
         )
         page = await self.request(path)
         if not isinstance(page, dict) or not isinstance(page.get("items"), list):
-            raise RuntimeError("Trading 212 returned an unreadable history page.")
+            raise TypeError("Trading 212 returned an unreadable history page.")
         result = {
             "environment": self.env,
             "items": page["items"],
             "next_page_path": None,
         }
-        if "nextPagePath" not in page or page["nextPagePath"] is not None:
-            try:
-                next_path = check_page(page.get("nextPagePath"), endpoint)
-            except ValueError:
-                result[
-                    "coverage_warning"
-                ] = "Trading 212 returned an unusable cursor. History coverage is incomplete."
+        if "nextPagePath" in page and page["nextPagePath"] is None:
+            return result
+        try:
+            next_path = check_page(page.get("nextPagePath"), endpoint)
+        except ValueError:
+            result["coverage_warning"] = (
+                "Trading 212 returned an unusable cursor. History coverage is incomplete."
+            )
+        else:
+            if next_path == path:
+                result["coverage_warning"] = (
+                    "Trading 212 repeated its cursor. History coverage is incomplete."
+                )
             else:
-                if next_path == path:
-                    result[
-                        "coverage_warning"
-                    ] = "Trading 212 repeated its cursor. History coverage is incomplete."
-                else:
-                    result["next_page_path"] = next_path
+                result["next_page_path"] = next_path
         return result
 
     async def preview(
@@ -311,7 +328,7 @@ class Trading212:
         }
 
     async def submit(
-        self, preview_id: str, session: ServerSession, request_id: str | int
+        self, preview_id: str, confirm: Callable[[str], Awaitable[bool]]
     ) -> dict[str, Any]:
         # Pop before any await so concurrent submissions cannot both submit the same order.
         preview = self.previews.pop(preview_id, None)
@@ -329,15 +346,7 @@ class Trading212:
             f"Value at the limit is {preview.details()['value_at_limit_before_fees_or_fx']} {preview.quote_currency} "
             f"before fees or FX. Account currency is {preview.account_currency}."
         )
-        try:
-            answer = await elicit_with_validation(
-                session, note, ConfirmOrder, related_request_id=request_id
-            )
-        except (McpError, ValueError):
-            raise ValueError(
-                "Order was not sent. Use an MCP client with interactive form elicitation for order approval."
-            ) from None
-        if answer.action != "accept" or not answer.data or not answer.data.approve:
+        if await confirm(note) is not True:
             return {
                 "environment": self.env,
                 "account_label": "primary",

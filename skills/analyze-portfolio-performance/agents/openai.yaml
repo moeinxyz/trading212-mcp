@@ -1,0 +1,4 @@
+interface:
+  display_name: "Measure portfolio performance"
+  short_description: "Calculate returns, benchmark gaps and historical drawdowns"
+  default_prompt: "Use $analyze-portfolio-performance to work out my return after cash flows and compare it with my benchmark."
