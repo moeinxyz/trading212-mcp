@@ -2,19 +2,23 @@
 
 [![CI](https://github.com/moeinxyz/trading212-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/moeinxyz/trading212-mcp/actions/workflows/ci.yml)
 
-I built this for my own portfolio. It lets an assistant read Trading 212 Invest and Stocks ISA accounts locally and explain the numbers. **Use it at your own risk.** Figures and AI analysis can be wrong. I don’t provide investment advice through this project. You make your own investment decisions. Check figures and orders in Trading 212 before acting.
+I built this for my own portfolio. Ask your AI about holdings and cash in your Trading 212 Invest and Stocks ISA accounts. **Use it at your own risk.** Figures and AI analysis can be wrong. Check them in Trading 212 before making investment decisions.
 
-## Connect to Codex on a Mac
+## Connect your AI
 
-In your Trading 212 account, open **Menu → Settings → API (Beta) → Generate API key**. Choose **Account data** and **Portfolio** to read holdings and cash. Keep the key and secret handy for the Terminal prompts. [Trading 212’s key guide](https://helpcentre.trading212.com/hc/en-us/articles/14584770928157-Trading-212-API-key)
+Use an AI app that supports local MCP servers and can run `uvx`. Your app starts the server when needed. On the first run, uv downloads the Python package and dependencies into its cache. [How uvx works](https://docs.astral.sh/uv/guides/tools/)
 
-With Codex installed, paste this command into Terminal.
+**1. Connect your account once.** In Trading 212, choose **Menu → Settings → API (Beta) → Generate API key** and select **Account data** and **Portfolio**. Run the command below in a terminal and enter the key and secret at the hidden prompts. For an ISA, use `--account isa`. [Trading 212’s key guide](https://helpcentre.trading212.com/hc/en-us/articles/14584770928157-Trading-212-API-key)
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/moeinxyz/trading212-mcp/v0.4.0/install.sh | sh
+uvx --from https://github.com/moeinxyz/trading212-mcp/archive/refs/tags/v0.4.0.tar.gz trading212-mcp setup --account invest
 ```
 
-The installer handles Python, saves your keys locally and connects the server to Codex. Restart Codex and ask **“Show my holdings and available cash.”** Orders are disabled by default. [Inspect the installer](install.sh) · [Add an ISA](docs/configuration.md#accounts-and-credentials) · [Windows, Linux and other clients](docs/configuration.md#connect-a-client)
+**2. Add Trading 212 to your AI app.** Choose your client below and review the connection. The links contain only the launch command. Orders are disabled by default.
+
+[Add to LM Studio](https://lmstudio.ai/install-mcp?name=trading212&config=eyJjb21tYW5kIjoidXZ4IiwiYXJncyI6WyItLWZyb20iLCJodHRwczovL2dpdGh1Yi5jb20vbW9laW54eXovdHJhZGluZzIxMi1tY3AvYXJjaGl2ZS9yZWZzL3RhZ3MvdjAuNC4wLnRhci5neiIsInRyYWRpbmcyMTItbWNwIl19) · [Add to Cursor](https://cursor.com/en/install-mcp?name=trading212&config=eyJjb21tYW5kIjoidXZ4IiwiYXJncyI6WyItLWZyb20iLCJodHRwczovL2dpdGh1Yi5jb20vbW9laW54eXovdHJhZGluZzIxMi1tY3AvYXJjaGl2ZS9yZWZzL3RhZ3MvdjAuNC4wLnRhci5neiIsInRyYWRpbmcyMTItbWNwIl19) · [Claude Desktop, ChatGPT Desktop, Codex and other clients](docs/configuration.md#connect-a-client)
+
+Open a chat and ask **“Show my holdings and available cash.”**
 
 ## Ask about your portfolio
 

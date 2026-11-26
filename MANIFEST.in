@@ -1,4 +1,3 @@
 include uv.lock
-include install.sh
 include docs/configuration.md
 include docs/research.md

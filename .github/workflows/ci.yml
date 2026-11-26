@@ -36,9 +36,6 @@ jobs:
           enable-cache: false
       - run: uv sync --locked
       - run: uv run --no-sync python -m pytest -q
-      - name: Exercise the macOS installer in a temporary home
-        if: runner.os == 'macOS'
-        run: uv run --no-sync python -m pytest -q .github/scripts/test_installer.py
 
   package:
     name: Lint, format and installed wheel
@@ -59,7 +56,7 @@ jobs:
       - run: uv run --no-sync ruff format --check .
       - name: Build the source distribution and its wheel
         run: uv build --out-dir "$RUNNER_TEMP/dist"
-      - name: Verify the installed wheel over stdio
+      - name: Verify the installed wheel and the on-demand uvx launch over stdio
         env:
           UV_PROJECT_ENVIRONMENT: ${{ runner.temp }}/wheel-env
         run: |
@@ -68,3 +65,4 @@ jobs:
           uv pip install --python "$python" --no-deps "$RUNNER_TEMP"/dist/*.whl
           cd "$RUNNER_TEMP"
           "$python" -I "$GITHUB_WORKSPACE/.github/scripts/smoke_wheel.py"
+          "$python" -I "$GITHUB_WORKSPACE/.github/scripts/smoke_wheel.py" uvx --from "$RUNNER_TEMP"/dist/*.tar.gz trading212-mcp

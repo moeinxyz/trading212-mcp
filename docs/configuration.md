@@ -2,47 +2,86 @@
 
 ## Connect a client
 
-For Codex on macOS, use the [one-command installer](../README.md#connect-to-codex-on-a-mac) in Terminal. For Windows, Linux or another MCP client, install [uv](https://docs.astral.sh/uv/getting-started/installation/) and run this command in a terminal.
-
-```sh
-uv tool install --python 3.13 https://github.com/moeinxyz/trading212-mcp/archive/refs/tags/v0.4.0.tar.gz
-```
-
-With Codex, run `trading212-mcp connect` and follow the prompts. For another client, run `trading212-mcp setup`. Choose `live` for a real account or `demo` for a practice account, then enter a key pair generated in that environment. Setup prints the location of the private account file. [Broker key setup and revocation](https://helpcentre.trading212.com/hc/en-us/articles/14584770928157-Trading-212-API-key)
-
-The default file is `~/.config/trading212-mcp/accounts.toml` on macOS and Linux (or under `XDG_CONFIG_HOME`) and `%APPDATA%\trading212-mcp\accounts.toml` on Windows. If your terminal cannot find `trading212-mcp` after a manual installation with uv, run `uv tool update-shell` and reopen the terminal.
-
-The Mac installer keeps its launcher and runtime in `~/.local/share/trading212-mcp` (or under `XDG_DATA_HOME`). A new Codex registration uses the full launcher path. If Codex already uses this server, the connector can reuse that registration and its account file. Update that original installation to change the version Codex runs. To disconnect a server added by the installer, run `codex mcp remove trading212`. To revoke a key, open the API settings in Trading 212.
-
-For another stdio client that accepts JSON configuration, add this entry to its server settings.
+Your client needs access to `uvx` (included with uv) on the computer that runs it. If you already have uv, use the configuration below. On first launch, `uvx` downloads the tagged release and any needed dependencies. It can also download a compatible Python if one is missing. The server runs locally in a cached, isolated environment. Complete the private account setup below, then give your client this local **stdio** server. [Install uv](https://docs.astral.sh/uv/getting-started/installation/) · [How uvx runs tools](https://docs.astral.sh/uv/guides/tools/) · [Accounts and credentials](#accounts-and-credentials)
 
 ```json
 {
   "mcpServers": {
     "trading212": {
-      "command": "trading212-mcp"
+      "command": "uvx",
+      "args": [
+        "--from",
+        "https://github.com/moeinxyz/trading212-mcp/archive/refs/tags/v0.4.0.tar.gz",
+        "trading212-mcp"
+      ]
     }
   }
 }
 ```
 
-If a desktop client cannot find the command, set `command` to its full path from `command -v trading212-mcp` (macOS/Linux) or `(Get-Command trading212-mcp).Source` (PowerShell). Restart the client. `trading_status` reports the configured environment and labels locally. `get_account_summary` tests the key against the broker.
+Merge the `trading212` entry into your existing server list. For clients with a form, use `trading212` as the name, `uvx` as the command and the three array items as separate arguments. If a desktop app cannot find `uvx`, use its full path from `command -v uvx` on macOS/Linux or `(Get-Command uvx).Source` in PowerShell. Leave `setup` out of the server arguments so the client starts the MCP session.
+
+| Client | Where to add it |
+| --- | --- |
+| Claude Desktop | Open **Settings → Developer → Edit Config**, merge the entry into `claude_desktop_config.json`, then fully quit and reopen Claude. [Local server guide](https://modelcontextprotocol.io/docs/develop/connect-local-servers) |
+| LM Studio | Open **Program → Install → Edit mcp.json**, then merge the entry and save. [LM Studio MCP guide](https://lmstudio.ai/docs/app/mcp) |
+| Cursor | Add the entry to `~/.cursor/mcp.json` for your local editor across projects. [Cursor MCP guide](https://cursor.com/docs/mcp) |
+| ChatGPT Desktop or Codex | In the desktop app, open **Settings → MCP servers → Add server**, choose **STDIO**, enter the command and arguments above, save and select **Restart**. Codex CLI and its IDE extension share this configuration. [OpenAI local MCP guide](https://learn.chatgpt.com/docs/extend/mcp) |
+
+Ask **“Which account labels are configured?”** `trading_status` answers locally. Then ask **“Show the available cash and my three largest holdings in the invest account.”** Substitute `isa` or `primary` for a different label. The second question uses the broker API.
+
+ChatGPT web uses remote MCP connections. Eligible workspaces can connect a private stdio server through OpenAI’s separately configured secure tunnel. Consumer Meta Muse runs on its own cloud computer. We could not verify a consumer setting to launch this local command there. For a regular hosted chat, you can share a summary you have reviewed from a supported local client. Keep the credentials private. [OpenAI custom MCP guide](https://help.openai.com/en/articles/12584461-connecting-custom-mcp-servers-in-chatgpt) · [OpenAI secure tunnels](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels) · [How Meta Muse runs](https://about.fb.com/news/2026/09/introducing-muse-personal-ai-agent/)
 
 ## Accounts and credentials
 
-Your first key can belong to Invest or Stocks ISA and is labelled `primary`. To add an ISA, switch to it in Trading 212 and generate its own read-only key pair. With the Mac installer, run the same command with an account label.
+1. Switch to the **Invest** or **Stocks & Shares ISA** account you want in Trading 212. Open **Menu → Settings → API (Beta) → Generate API key**. Choose **Account data** for cash and account totals, and **Portfolio** for individual holdings. Leave order execution disabled for a read-only key. Add other read permissions only for tools you want. Save the API Key and its one-time API Secret Key privately. [Trading 212 key creation and revocation](https://helpcentre.trading212.com/hc/en-us/articles/14584770928157-Trading-212-API-key)
+2. Run the matching one-time command below in your terminal. Enter `live` for your real account or `demo` for practice, then enter the key and secret at the hidden prompts. For both accounts, switch accounts in Trading 212 and generate a separate pair before running the other command.
+
+**Invest**
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/moeinxyz/trading212-mcp/v0.4.0/install.sh | sh -s -- --account isa
+uvx --from https://github.com/moeinxyz/trading212-mcp/archive/refs/tags/v0.4.0.tar.gz trading212-mcp setup --account invest
 ```
 
-With the manual installation, run `trading212-mcp setup --account isa`. If your first account was ISA and the second is Invest, use `--account invest` instead. Restart the MCP client, then ask for Invest, ISA or both.
+**Stocks & Shares ISA**
 
-Ask “Show only my ISA” to select the appropriate label. Ask “Show both accounts and combine the GBP balances” to use `get_portfolio_overview(accounts=["primary", "isa"])`. Without a selection, the overview tries all configured profiles and identifies unconfigured ones. It shows each account's available cash, investments and total value. It groups values by live/practice and currency and counts each broker account ID once. A failed requested account makes the combined total unavailable. The separate account results show what was actually retrieved.
+```sh
+uvx --from https://github.com/moeinxyz/trading212-mcp/archive/refs/tags/v0.4.0.tar.gz trading212-mcp setup --account isa
+```
 
-Labels describe your configuration. Check each broker ID in `get_account_summary` against **Menu → My account → Account details** to confirm which account is which. Two different keys can refer to the same account. [Finding your account number](https://helpcentre.trading212.com/hc/en-us/articles/360008823837-Where-can-I-find-my-account-reference-number)
+The saved labels are `invest` and `isa`. Omitting `--account` creates the legacy/default `primary` label for either account type. Existing `primary` profiles still work. Keep that label if you already use it. The labels are local names. Check `account.id` from `get_account_summary(account="invest")` against **Menu → My account → Account details** in Trading 212 to verify the underlying account. [Finding your account number](https://helpcentre.trading212.com/hc/en-us/articles/360008823837-Where-can-I-find-my-account-reference-number)
 
-To reuse an existing settings file, pass its absolute path in the client environment as `T212_CONFIG_FILE`. The file uses `[trading]` for primary and `[trading_accounts.<label>]` for other accounts. On Unix the owner must be the current user and the file must be private (`chmod 600`). For environment-only setups, pass `T212_ENV`, `T212_API_KEY` and `T212_API_SECRET` through a private launcher. Optional `T212_ISA_API_KEY` and `T212_ISA_API_SECRET` add an ISA in the same environment. Explicit server settings take precedence over automatic file discovery. An environment override for credentials must supply the key and secret together.
+Setup saves new profiles as read-only and preserves existing key pairs. The key and secret are stored in a local, unencrypted TOML file protected by your user account. On macOS/Linux it defaults to `~/.config/trading212-mcp/accounts.toml` (or under `XDG_CONFIG_HOME`). On Windows it defaults to `%APPDATA%\trading212-mcp\accounts.toml`. To use another private file, set `T212_CONFIG_FILE` to the same absolute path in the setup environment and the host's server environment. On Unix use an owner-only file such as mode `600`. To rotate credentials, update the pair in its existing private account section, restart the client and revoke the old key in Trading 212.
+
+Ask “Show both accounts and combine the GBP balances” to use `get_portfolio_overview(accounts=["invest", "isa"])`. With no account selection the overview tries the configured profiles, groups results by live/practice and currency, and counts each broker account ID once. If a requested account fails, the response shows the available account results and marks the combined total unavailable. For a single-account tool such as `list_positions`, pass the saved label explicitly. Its default is `primary`.
+
+Existing file-based settings use `[trading]` for `primary` and `[trading_accounts.<label>]` for additional accounts. A host that provides private environment variables can supply a primary pair with `T212_ENV`, `T212_API_KEY` and `T212_API_SECRET`. An optional `T212_ISA_API_KEY` and `T212_ISA_API_SECRET` pair adds an ISA. Specifying any server settings in the environment disables automatic file discovery, so also set `T212_CONFIG_FILE` if you want to include file profiles. Override both parts of a key pair together.
+
+### VS Code masked credential prompts
+
+If uv is already available, VS Code’s **editor-managed** server configuration can prompt privately for one account without the terminal setup step. In a local VS Code window, run **MCP: Open User Configuration** from the Command Palette and merge the following. Start the server and enter each value in its masked prompt. This example connects a read-only real account labelled `primary`. For practice keys, set `T212_ENV` to `demo`. [VS Code MCP input variables](https://code.visualstudio.com/docs/copilot/reference/mcp-configuration)
+
+```json
+{
+  "inputs": [
+    {"id": "t212Key", "type": "promptString", "description": "Trading 212 API Key", "password": true},
+    {"id": "t212Secret", "type": "promptString", "description": "Trading 212 API Secret", "password": true}
+  ],
+  "servers": {
+    "trading212": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["--from", "https://github.com/moeinxyz/trading212-mcp/archive/refs/tags/v0.4.0.tar.gz", "trading212-mcp"],
+      "env": {
+        "T212_ENV": "live",
+        "T212_API_KEY": "${input:t212Key}",
+        "T212_API_SECRET": "${input:t212Secret}",
+        "T212_ENABLE_WRITES": "false"
+      }
+    }
+  }
+}
+```
 
 ## Tools and permissions
 
