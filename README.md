@@ -4,16 +4,17 @@
 
 I built this for my own portfolio. It lets an assistant read Trading 212 Invest and Stocks ISA accounts locally and explain the numbers. **Use it at your own risk.** Figures and AI analysis can be wrong. I don’t provide investment advice through this project. You make your own investment decisions. Check figures and orders in Trading 212 before acting.
 
-## Get started
+## Connect to Codex on a Mac
 
-In each account, open **Menu → Settings → API (Beta) → Generate API key**. Select **Account data** and **Portfolio** for holdings and cash. With Git and [uv](https://docs.astral.sh/uv/getting-started/installation/) installed, set up the first account. Keys are entered privately and orders are disabled by default.
+In your Trading 212 account, open **Menu → Settings → API (Beta) → Generate API key**. Choose **Account data** and **Portfolio** to read holdings and cash. Keep the key and secret handy for the Terminal prompts. [Trading 212’s key guide](https://helpcentre.trading212.com/hc/en-us/articles/14584770928157-Trading-212-API-key)
+
+With Codex installed, paste this command into Terminal.
 
 ```sh
-uv tool install git+https://github.com/moeinxyz/trading212-mcp@v0.3.0
-trading212-mcp setup
+curl -fsSL https://raw.githubusercontent.com/moeinxyz/trading212-mcp/v0.4.0/install.sh | sh
 ```
 
-Have a second account? Switch to it in Trading 212, generate its own key, and run `trading212-mcp setup --account isa`. For Codex, register the server with `codex mcp add trading212 -- trading212-mcp`. Restart the client and ask for Invest, ISA or both. [Client setup and account labels](docs/configuration.md#accounts-and-credentials)
+The installer handles Python, saves your keys locally and connects the server to Codex. Restart Codex and ask **“Show my holdings and available cash.”** Orders are disabled by default. [Inspect the installer](install.sh) · [Add an ISA](docs/configuration.md#accounts-and-credentials) · [Windows, Linux and other clients](docs/configuration.md#connect-a-client)
 
 ## Ask about your portfolio
 

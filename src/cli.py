@@ -1,4 +1,4 @@
-"""Run the stdio server, or configure a read-only account from a terminal."""
+"""Run the stdio server, set up an account, or connect it to Codex."""
 
 import argparse
 import getpass
@@ -160,9 +160,10 @@ def save_account(
             Path(temp_name).unlink(missing_ok=True)
 
 
-def setup(account: str = "primary") -> None:
-    filename = os.environ.get("T212_CONFIG_FILE")
-    path = Path(filename) if filename is not None else default_config()
+def setup(account: str = "primary", *, path: Path | None = None) -> None:
+    if path is None:
+        filename = os.environ.get("T212_CONFIG_FILE")
+        path = Path(filename) if filename is not None else default_config()
     message = existing_profile_message(path, account)
     if message:
         print(f"{message} Settings are in {path}.")
@@ -200,12 +201,27 @@ def main() -> None:
         metavar="LABEL",
         help="a local label such as primary or isa",
     )
+    connect_parser = commands.add_parser(
+        "connect", help="set up an account and register this server with Codex"
+    )
+    connect_parser.add_argument(
+        "--account", metavar="LABEL", help="configure a particular account, such as isa"
+    )
     args = parser.parse_args()
-    if args.command == "setup":
+    if args.command in {"setup", "connect"}:
         try:
-            setup(args.account)
+            if args.command == "connect":
+                from .connect import connect
+
+                connect(args.account)
+            else:
+                setup(args.account)
         except (EOFError, KeyboardInterrupt, getpass.GetPassWarning):
-            raise SystemExit("Setup cancelled.") from None
+            raise SystemExit(
+                "Connect cancelled."
+                if args.command == "connect"
+                else "Setup cancelled."
+            ) from None
         except ValueError as exc:
             raise SystemExit(str(exc)) from None
         except OSError as exc:

@@ -36,6 +36,9 @@ jobs:
           enable-cache: false
       - run: uv sync --locked
       - run: uv run --no-sync python -m pytest -q
+      - name: Exercise the macOS installer in a temporary home
+        if: runner.os == 'macOS'
+        run: uv run --no-sync python -m pytest -q .github/scripts/test_installer.py
 
   package:
     name: Lint, format and installed wheel

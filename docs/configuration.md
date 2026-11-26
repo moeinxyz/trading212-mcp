@@ -2,11 +2,19 @@
 
 ## Connect a client
 
-Run `trading212-mcp setup` in your terminal. Choose `live` for a real account or `demo` for a practice account, and enter a key pair generated in that same environment. Setup creates an owner-only file on Unix and prints its location. On Windows it uses your user's application-data directory. Running setup again preserves the existing file. Edit it locally to change accounts or rotate keys. [Broker key setup and revocation](https://helpcentre.trading212.com/hc/en-us/articles/14584770928157-Trading-212-API-key)
+For Codex on macOS, use the [one-command installer](../README.md#connect-to-codex-on-a-mac) in Terminal. For Windows, Linux or another MCP client, install [uv](https://docs.astral.sh/uv/getting-started/installation/) and run this command in a terminal.
 
-The default file is `~/.config/trading212-mcp/accounts.toml` on macOS and Linux (or under `XDG_CONFIG_HOME`) and `%APPDATA%\trading212-mcp\accounts.toml` on Windows. If the installed command is missing from your terminal, run `uv tool update-shell` and reopen the terminal.
+```sh
+uv tool install --python 3.13 https://github.com/moeinxyz/trading212-mcp/archive/refs/tags/v0.4.0.tar.gz
+```
 
-For Codex, run `codex mcp add trading212 -- trading212-mcp`. For another stdio client that accepts JSON configuration, add this entry to its server settings.
+With Codex, run `trading212-mcp connect` and follow the prompts. For another client, run `trading212-mcp setup`. Choose `live` for a real account or `demo` for a practice account, then enter a key pair generated in that environment. Setup prints the location of the private account file. [Broker key setup and revocation](https://helpcentre.trading212.com/hc/en-us/articles/14584770928157-Trading-212-API-key)
+
+The default file is `~/.config/trading212-mcp/accounts.toml` on macOS and Linux (or under `XDG_CONFIG_HOME`) and `%APPDATA%\trading212-mcp\accounts.toml` on Windows. If your terminal cannot find `trading212-mcp` after a manual installation with uv, run `uv tool update-shell` and reopen the terminal.
+
+The Mac installer keeps its launcher and runtime in `~/.local/share/trading212-mcp` (or under `XDG_DATA_HOME`). A new Codex registration uses the full launcher path. If Codex already uses this server, the connector can reuse that registration and its account file. Update that original installation to change the version Codex runs. To disconnect a server added by the installer, run `codex mcp remove trading212`. To revoke a key, open the API settings in Trading 212.
+
+For another stdio client that accepts JSON configuration, add this entry to its server settings.
 
 ```json
 {
@@ -22,7 +30,13 @@ If a desktop client cannot find the command, set `command` to its full path from
 
 ## Accounts and credentials
 
-Your first key can belong to Invest or Stocks ISA and is labelled `primary`. To connect a second account, switch to it in Trading 212 and generate its own read-only key pair. Run `trading212-mcp setup --account isa` to save the pair under `isa`. If your first account was ISA and the second is Invest, use `--account invest` instead. For a fresh setup you can also name both accounts explicitly with `setup --account invest` and `setup --account isa`. Restart the MCP client.
+Your first key can belong to Invest or Stocks ISA and is labelled `primary`. To add an ISA, switch to it in Trading 212 and generate its own read-only key pair. With the Mac installer, run the same command with an account label.
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/moeinxyz/trading212-mcp/v0.4.0/install.sh | sh -s -- --account isa
+```
+
+With the manual installation, run `trading212-mcp setup --account isa`. If your first account was ISA and the second is Invest, use `--account invest` instead. Restart the MCP client, then ask for Invest, ISA or both.
 
 Ask “Show only my ISA” to select the appropriate label. Ask “Show both accounts and combine the GBP balances” to use `get_portfolio_overview(accounts=["primary", "isa"])`. Without a selection, the overview tries all configured profiles and identifies unconfigured ones. It shows each account's available cash, investments and total value. It groups values by live/practice and currency and counts each broker account ID once. A failed requested account makes the combined total unavailable. The separate account results show what was actually retrieved.
 
